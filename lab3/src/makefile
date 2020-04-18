@@ -1,5 +1,11 @@
+.PHONY: all clean
 CC=gcc
 CFLAGS=-I.
+
+all : sequential_min_max parallel_min_max exec_sequential
+
+exec_sequential : exec_sequential.c
+	$(CC) -o exec_sequential exec_sequential.c
 
 sequential_min_max : utils.o find_min_max.o utils.h find_min_max.h
 	$(CC) -o sequential_min_max find_min_max.o utils.o sequential_min_max.c $(CFLAGS)

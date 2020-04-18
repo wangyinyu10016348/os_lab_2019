@@ -40,18 +40,32 @@ int main(int argc, char **argv) {
         switch (option_index) {
           case 0:
             seed = atoi(optarg);
-            // your code here
-            // error handling
+            //this is my code
+            if (seed <= 0) {
+                printf("Invalid arguments (seed)!\n");
+                exit(EXIT_FAILURE);
+            }
+            //end
             break;
           case 1:
             array_size = atoi(optarg);
-            // your code here
-            // error handling
+            //this is my code
+            if (array_size <= 0)
+            {
+                printf("Invalid arguments (array_size)!\n");
+                exit(EXIT_FAILURE);
+            }
+            //end
             break;
           case 2:
             pnum = atoi(optarg);
-            // your code here
-            // error handling
+            //this is my code
+            if (pnum <= 0)
+            {
+                printf("Invalid arguments (pnum)!\n");
+                exit(EXIT_FAILURE);
+            }
+            //end
             break;
           case 3:
             with_files = true;
@@ -88,6 +102,23 @@ int main(int argc, char **argv) {
   GenerateArray(array, array_size, seed);
   int active_child_processes = 0;
 
+int array_part = array_size / pnum;
+  int pipefd1[2];
+  int pipefd2[2];
+  char min_array[24];
+  char max_array[24];
+  
+  if (!with_files) {
+      if (pipe(pipefd1) == -1) {
+           perror("pipe1");
+           exit(EXIT_FAILURE);
+       }
+       if (pipe(pipefd2) == -1) {
+           perror("pipe2");
+           exit(EXIT_FAILURE);
+       }
+  }
+
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
 
@@ -98,13 +129,41 @@ int main(int argc, char **argv) {
       active_child_processes += 1;
       if (child_pid == 0) {
         // child process
-
+        struct MinMax min_max;
         // parallel somehow
 
+        if (i != pnum - 1) {
+            min_max = GetMinMax(array, i*(array_part), (i + 1)*(array_part));
+        }
+        // c++ discards a fractional part of the quotient after dividing operation
+        else {
+            min_max = GetMinMax(array, i*(array_part), array_size);
+        }
+
         if (with_files) {
-          // use files here
+            ///////////////////my code
+          char filename[8];
+            snprintf(filename, 8, "file%d", i);
+            
+            FILE* fp;
+            fp = fopen(filename, "w+");
+            fprintf(fp, "%d,%d", min_max.min, min_max.max);
+            fclose(fp);
+            ////////end
         } else {
-          // use pipe here
+          /////////// my code
+          snprintf(min_array, 24, "%d", min_max.min);
+            snprintf(max_array, 24, "%d", min_max.max);
+        
+            close(pipefd1[0]); // Close unused read end
+            close(pipefd2[0]); // Close unused read end 
+            
+            write(pipefd1[1], min_array, 24);
+            write(pipefd2[1], max_array, 24);
+            
+            close(pipefd1[1]); // Reader will see EOF (end of file)
+            close(pipefd2[1]); // Reader will see EOF (end of file)
+            ///////end
         }
         return 0;
       }
@@ -116,23 +175,43 @@ int main(int argc, char **argv) {
   }
 
   while (active_child_processes > 0) {
-    // your code here
-
+    //////////////my code
+    wait(NULL); // blocks parent process until any of its children has finished
     active_child_processes -= 1;
+    ////////end
   }
 
   struct MinMax min_max;
   min_max.min = INT_MAX;
   min_max.max = INT_MIN;
+  char buffer[24];
 
   for (int i = 0; i < pnum; i++) {
     int min = INT_MAX;
     int max = INT_MIN;
 
     if (with_files) {
-      // read from files
+      //////////////my code
+        char filename[8];
+        snprintf(filename, 8, "file%d", i);
+        
+        FILE* fp;
+        fp = fopen(filename, "r");
+        fscanf(fp, "%d,%d", &min, &max);
+        fclose(fp);
+        remove(filename);
+      /////////end
     } else {
-      // read from pipes
+        ////////////my code
+      close(pipefd1[1]);          /* Close unused write end */
+      close(pipefd2[1]);          /* Close unused write end */
+     
+      read(pipefd1[0], buffer, 24);
+      min = atoi(buffer);
+      
+      read(pipefd2[0], buffer, 24);
+      max = atoi(buffer);
+      /////////end
     }
 
     if (min < min_max.min) min_max.min = min;
